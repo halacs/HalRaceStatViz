@@ -20,18 +20,33 @@ def load_data(file_path):
     df['net_time_minutes'] = df['netto_td'].dt.total_seconds() / 60.0
     df['gender'] = df['kategoria'].str[0].map({'M': 'Férfi', 'W': 'Nő'})
 
-    # Extract age category limits
-    df['age_cat_start'] = df['kategoria'].str[1:].astype(int)
+    # Map category to age range string
+    def map_age_range(kategoria):
+        if not isinstance(kategoria, str) or len(kategoria) < 2:
+            return "Egyéb"
+        code = kategoria[1:]
+        if code in ("5-", "-5", "5"):
+            return "-5"
+        elif code in ("6", "06"):
+            return "6-11"
+        elif code == "12":
+            return "12-15"
+        elif code == "16":
+            return "16-17"
+        elif code == "18":
+            return "18-19"
+        elif code == "20":
+            return "20-24"
+        elif code in ("80", "80+"):
+            return "80+"
+        else:
+            try:
+                val = int(code)
+                return f"{val}-{val+4}"
+            except ValueError:
+                return code
 
-    # Map age start to age range string
-    def map_age_range(age):
-        if age == 16: return "16-17"
-        elif age == 18: return "18-19"
-        elif age == 20: return "20-24"
-        elif age == 80: return "80+"
-        else: return f"{age}-{age+4}"
-
-    df['age_range'] = df['age_cat_start'].apply(map_age_range)
+    df['age_range'] = df['kategoria'].apply(map_age_range)
     return df
 
 def generate_charts(file_name, event_title, prefix):
@@ -41,18 +56,22 @@ def generate_charts(file_name, event_title, prefix):
 
     df = load_data(file_name)
 
-    out_dir = os.path.dirname(prefix)
+    out_dir = os.path.dirname(prefix) if not prefix.endswith(('/', '\\')) else prefix
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
+
+    sep = "" if prefix.endswith(('/', '\\')) else "_"
 
     # Common settings matching your reference images
     plt.rcParams['font.family'] = 'sans-serif'
     sns.set_theme(style="whitegrid", rc={"axes.facecolor": "#ffffff", "grid.color": "#e0e0e0"})
 
     # Determine unique age ranges in logical order
-    age_ranges = ["16-17", "18-19", "20-24", "25-29", "30-34", "35-39", "40-44",
-                  "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+"]
+    age_ranges = ["-5", "6-11", "12-15", "16-17", "18-19", "20-24", "25-29", "30-34", "35-39",
+                  "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+"]
     existing_ranges = [r for r in age_ranges if r in df['age_range'].unique()]
+    extra_ranges = [r for r in df['age_range'].unique() if r not in age_ranges]
+    existing_ranges.extend(extra_ranges)
 
     palette = {'Férfi': '#4A88B7', 'Nő': '#E77C7C'}
 
@@ -79,7 +98,7 @@ def generate_charts(file_name, event_title, prefix):
     sns.despine(left=True, bottom=False)
     plt.tight_layout()
     add_watermark(fig1)
-    fig1.savefig(f"{prefix}_boxplot_celidok_kategoriankent.jpg", dpi=300)
+    fig1.savefig(f"{prefix}{sep}boxplot_celidok_kategoriankent.jpg", dpi=300)
     plt.close(fig1)
 
     # 2. Histogram (Célidők megoszlása)
@@ -114,7 +133,7 @@ def generate_charts(file_name, event_title, prefix):
     sns.despine(left=True)
     plt.tight_layout()
     add_watermark(fig2)
-    fig2.savefig(f"{prefix}_celidok_megoszlasa.jpg", dpi=300)
+    fig2.savefig(f"{prefix}{sep}celidok_megoszlasa.jpg", dpi=300)
     plt.close(fig2)
 
     # 3. Bar chart (Korosztályos kategóriák létszáma)
@@ -139,7 +158,7 @@ def generate_charts(file_name, event_title, prefix):
     sns.despine(left=True)
     plt.tight_layout()
     add_watermark(fig3)
-    fig3.savefig(f"{prefix}_korcsoport_letszam_eletkor_szerint.jpg", dpi=300)
+    fig3.savefig(f"{prefix}{sep}korcsoport_letszam_eletkor_szerint.jpg", dpi=300)
     plt.close(fig3)
 
     # 4. Horizontal Bar chart (TOP 10 küldő ország)
@@ -160,7 +179,7 @@ def generate_charts(file_name, event_title, prefix):
     sns.despine(left=True, bottom=False)
     plt.tight_layout()
     add_watermark(fig4)
-    fig4.savefig(f"{prefix}_top10_orszag.jpg", dpi=300)
+    fig4.savefig(f"{prefix}{sep}top10_orszag.jpg", dpi=300)
     plt.close(fig4)
 
 if __name__ == "__main__":
